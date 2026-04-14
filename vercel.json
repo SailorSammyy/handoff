@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/proxy.js": {
+      "runtime": "edge"
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
