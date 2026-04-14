@@ -325,4 +325,53 @@ export default async function handler(req) {
   }
 }
 
+// Compatibility wrapper for Express/Node.js development
+export async function expressMiddleware(req, res) {
+  try {
+    // Convert Express request to Web API Request
+    const url = `http://localhost:3000${req.url}`;
+    const webReq = new Request(url, {
+      method: req.method,
+      headers: req.headers,
+    });
+
+    // Call the Edge handler
+    const response = await handler(webReq);
+
+    // Convert Web API Response back to Express response
+    res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+    
+    if (response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+      } catch (err) {
+        // If it's binary data, write directly
+        if (err instanceof TypeError) {
+          const binaryReader = response.body.getReader();
+          while (true) {
+            const { done, value } = await binaryReader.read();
+            if (done) break;
+            res.write(value);
+          }
+        } else {
+          throw err;
+        }
+      }
+    }
+    
+    res.end();
+  } catch (err) {
+    console.error('[Express Wrapper Error]', err);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', message: 'Internal server error' }));
+  }
+}
+
 export const config = { runtime: 'edge' };

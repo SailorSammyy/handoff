@@ -6,7 +6,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { expressMiddleware } from './api/proxy.js';
+import { handler as expressMiddleware } from './api/proxy.js';
 import { expressMiddleware as subtitleMiddleware } from './api/subtitle.js';
 import { getCorsHeaders, CORS_CONFIG } from './api/config.js';
 
