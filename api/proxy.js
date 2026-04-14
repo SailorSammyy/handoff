@@ -160,7 +160,7 @@ export default async function handler(req) {
     }
 
     const siteHeaders = getHeadersForUrl(targetUrl);
-    const range       = req.headers['range'] ?? null;
+    const range       = req.headers.get('range') ?? null;
 
     const mergedHeaders = {
       'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -182,17 +182,28 @@ export default async function handler(req) {
         headers: mergedHeaders,
       });
       
+      if (!response.ok) {
+        console.error(`[ERROR] Media ${response.status} for: ${targetUrl}`);
+        return sendError(response.status, response.statusText);
+      }
+      
       const headers = {
         ...corsHeaders,
         'Content-Type': response.headers.get('content-type') || 'application/octet-stream',
         'Content-Length': response.headers.get('content-length'),
         'Content-Range': response.headers.get('content-range'),
         'Accept-Ranges': response.headers.get('accept-ranges') || 'bytes',
+        'Cache-Control': getCacheControl(targetUrl),
       };
+      
+      // Filter out null values
+      const filteredHeaders = Object.fromEntries(
+        Object.entries(headers).filter(([_, v]) => v != null)
+      );
       
       return new Response(response.body, {
         status: response.status,
-        headers,
+        headers: filteredHeaders,
       });
     }
 
@@ -339,34 +350,42 @@ export async function expressMiddleware(req, res) {
     const response = await handler(webReq);
 
     // Convert Web API Response back to Express response
-    res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+    const headers = Object.fromEntries(response.headers.entries());
+    
+    // Handle range requests properly
+    if (response.status === 206) {
+      res.writeHead(response.status, headers);
+    } else {
+      res.writeHead(response.status, headers);
+    }
     
     if (response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      
-      try {
+      // For binary data (video/audio), pipe directly
+      if (response.headers.get('content-type')?.includes('video') || 
+          response.headers.get('content-type')?.includes('audio')) {
+        response.body.pipeTo(new WritableStream({
+          write(chunk) {
+            res.write(chunk);
+          },
+          close() {
+            res.end();
+          }
+        }));
+      } else {
+        // For text data, use the reader approach
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           res.write(value);
         }
-      } catch (err) {
-        // If it's binary data, write directly
-        if (err instanceof TypeError) {
-          const binaryReader = response.body.getReader();
-          while (true) {
-            const { done, value } = await binaryReader.read();
-            if (done) break;
-            res.write(value);
-          }
-        } else {
-          throw err;
-        }
+        res.end();
       }
+    } else {
+      res.end();
     }
-    
-    res.end();
   } catch (err) {
     console.error('[Express Wrapper Error]', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
