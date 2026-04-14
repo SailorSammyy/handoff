@@ -66,7 +66,7 @@ Returns server status and CORS config.
 ## Site Configs
 
 Automatic `Referer` / `Origin` / `User-Agent` headers are injected based on the target domain. Configured in `api/config.js` under `SITE_CONFIGS`:
-To add a new site, copy the template block in `api/config.js` and fill in the domains and headers
+To add a new site, copy the template block in `api/config.js` and fill in the domains and headers.
 
 ## Player UI
 
