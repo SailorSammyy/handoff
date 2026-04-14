@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Proxy Tester</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/artplayer@5/dist/artplayer.css"/>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/artplayer@5/dist/artplayer.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060608;
+  --bg1:#0d0d10;
+  --bg2:#131317;
+  --bg3:#1a1a1f;
+  --bg4:#222228;
+  --border:rgba(255,255,255,.07);
+  --border2:rgba(255,255,255,.12);
+  --text:#e8e8ec;
+  --text2:#9494a0;
+  --text3:#5a5a68;
+  --accent:#7c6af7;
+  --accent2:#9d8fff;
+  --accent-glow:rgba(124,106,247,.2);
+  --amber:#f5a623;
+  --emerald:#3ecf8e;
+  --pink:#f472b6;
+  --red:#f87171;
+  --font-display:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'DM Mono',monospace;
+  --r:14px;
+  --r-sm:10px;
+  --r-xs:7px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(124,106,247,.12),transparent);pointer-events:none;z-index:0}
+
+.wrap{max-width:1340px;margin:0 auto;padding:0 20px 60px;position:relative;z-index:1}
+
+.header{display:flex;align-items:center;justify-content:space-between;padding:28px 0 32px;gap:16px;flex-wrap:wrap}
+.header-logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent) 0%,#b06ef7 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(124,106,247,.3),0 8px 24px rgba(124,106,247,.25);flex-shrink:0}
+.logo-icon svg{width:22px;height:22px;color:#fff}
+.header-title{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.02em;color:#fff;line-height:1.1}
+.header-sub{font-size:12px;color:var(--text3);margin-top:2px;font-family:var(--font-mono);letter-spacing:.02em}
+.status-pill{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:100px;padding:7px 14px;font-size:12px;color:var(--text2);font-family:var(--font-mono);flex-shrink:0;transition:border-color .3s}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#44445a;flex-shrink:0;transition:background .3s}
+.status-dot.ready{background:#44445a}
+.status-dot.loading{background:var(--amber);animation:pulse 1.2s ease-in-out infinite}
+.status-dot.playing{background:var(--emerald);animation:pulse 1.8s ease-in-out infinite}
+.status-dot.loaded{background:var(--emerald)}
+.status-dot.paused{background:var(--amber)}
+.status-dot.error{background:var(--red)}
+
+.layout{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+@media(max-width:1100px){.layout{grid-template-columns:1fr 340px}}
+@media(max-width:880px){.layout{grid-template-columns:1fr}}
+
+.main-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.side-col{display:flex;flex-direction:column;gap:14px}
+@media(min-width:881px){.side-col{position:sticky;top:24px}}
+
+.card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 0;gap:8px}
+.card-title{font-family:var(--font-display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);display:flex;align-items:center;gap:7px}
+.card-title svg{width:13px;height:13px;color:var(--accent2);opacity:.8}
+.card-body{padding:14px 18px 18px}
+
+.player-wrap{background:#000;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:0 0 0 1px rgba(124,106,247,.08),0 24px 64px rgba(0,0,0,.6)}
+#artWrap{width:100%;aspect-ratio:16/9}
+.art-video-player{--art-theme:#7c6af7 !important;border-radius:0 !important}
+
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px}
+.stat-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:5px;font-family:var(--font-display)}
+.stat-value{font-family:var(--font-mono);font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px}
+.proxy-row{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;margin-top:8px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.proxy-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:4px;font-family:var(--font-display)}
+.proxy-val{font-family:var(--font-mono);font-size:10px;color:var(--text3);word-break:break-all;line-height:1.6;flex:1}
+.proxy-val.active{color:var(--text2)}
+.copy-btn{background:var(--bg4);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 9px;font-size:10px;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s;font-family:var(--font-mono)}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.copy-btn.hidden{display:none}
+
+.tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tags-row:empty{display:none}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-display)}
+.tag-o{background:rgba(245,166,35,.1);color:var(--amber);border:1px solid rgba(245,166,35,.2)}
+.tag-h{background:rgba(124,106,247,.1);color:var(--accent2);border:1px solid rgba(124,106,247,.2)}
+.tag-t{background:rgba(244,114,182,.1);color:var(--pink);border:1px solid rgba(244,114,182,.2)}
+
+.qual-panel{padding:14px 18px 18px}
+.qual-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.qchip{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 14px;font-size:12px;font-weight:600;font-family:var(--font-display);color:var(--text2);cursor:pointer;transition:all .15s}
+.qchip:hover{border-color:var(--border2);color:var(--text)}
+.qchip.on{background:rgba(124,106,247,.15);border-color:rgba(124,106,247,.4);color:var(--accent2)}
+
+label.field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);display:block;margin-bottom:7px;font-family:var(--font-display)}
+.field-note{font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-family:var(--font-body);opacity:.8}
+.input-row{display:flex;gap:8px}
+input[type=text],textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;color:var(--text);font-family:var(--font-body);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none}
+input[type=text]::placeholder,textarea::placeholder{color:var(--text3)}
+input[type=text]:focus,textarea:focus{border-color:rgba(124,106,247,.5);box-shadow:0 0 0 3px rgba(124,106,247,.1)}
+.input-wrap{position:relative;flex:1;min-width:0}
+.input-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:3px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:color .15s}
+.input-clear:hover{color:var(--text)}
+.input-clear svg{width:13px;height:13px}
+
+.btn-primary{background:var(--accent);border:none;border-radius:var(--r-sm);padding:10px 20px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:var(--font-display);letter-spacing:.01em;transition:all .15s;white-space:nowrap;flex-shrink:0;box-shadow:0 0 0 1px rgba(124,106,247,.3),0 4px 16px rgba(124,106,247,.25)}
+.btn-primary:hover{background:#6a58e0;box-shadow:0 0 0 1px rgba(124,106,247,.5),0 6px 20px rgba(124,106,247,.35)}
+.btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.btn-icon{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.btn-icon:hover{border-color:var(--border2);color:var(--text)}
+.btn-icon svg{width:17px;height:17px}
+.btn-icon label{cursor:pointer;display:flex}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+.adv-toggle{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-family:var(--font-display);background:none;border:none;cursor:pointer;padding:0;transition:color .15s;width:100%;text-align:left}
+.adv-toggle:hover{color:var(--text2)}
+.adv-chev{transition:transform .25s;flex-shrink:0}
+.adv-chev.open{transform:rotate(180deg)}
+.adv-body{max-height:0;overflow:hidden;transition:max-height .3s ease,opacity .25s ease;opacity:0}
+.adv-body.open{max-height:400px;opacity:1}
+textarea{resize:none;font-family:var(--font-mono);font-size:12px;line-height:1.7}
+.json-badge{display:none;font-size:9px;font-weight:700;font-family:var(--font-display);padding:2px 7px;border-radius:100px;text-transform:uppercase;letter-spacing:.05em;position:absolute;right:10px;top:10px}
+.json-ok-badge{background:rgba(62,207,142,.1);color:var(--emerald);border:1px solid rgba(62,207,142,.2)}
+.json-err-badge{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--r-sm);padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-top:10px}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(124,106,247,.05)}
+.drop-zone:hover .dz-icon,.drop-zone.over .dz-icon{color:var(--accent2);transform:scale(1.1)}
+.dz-icon{width:24px;height:24px;margin:0 auto 8px;color:var(--text3);transition:all .2s}
+.dz-text{font-size:11px;color:var(--text3)}
+.dz-text span{color:var(--text2)}
+.sub-meta{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sub-fmt{font-size:10px;font-weight:700;background:rgba(124,106,247,.15);color:var(--accent2);border:1px solid rgba(124,106,247,.2);padding:2px 8px;border-radius:100px;font-family:var(--font-display);text-transform:uppercase}
+.sub-cues{font-size:11px;color:var(--text2);font-family:var(--font-mono);margin-left:8px}
+.sub-rm{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:6px;transition:all .15s;display:flex}
+.sub-rm:hover{color:var(--red);background:rgba(248,113,113,.1)}
+.sub-rm svg{width:14px;height:14px}
+.sub-scroll{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);max-height:180px;overflow-y:auto}
+.sub-list-head{padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-family:var(--font-display);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
+.sub-entry{padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-left:2px solid transparent}
+.sub-entry:last-child{border-bottom:none}
+.sub-entry:hover{background:rgba(124,106,247,.05)}
+.sub-entry.active{background:rgba(124,106,247,.1);border-left-color:var(--accent)}
+.sub-time{font-size:9px;font-family:var(--font-mono);color:var(--text3);margin-bottom:3px}
+.sub-text{font-size:11px;color:var(--text2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5}
+
+.slider-row{display:flex;align-items:center;gap:10px;padding:4px 0}
+.slider-label{font-size:11px;color:var(--text3);width:48px;flex-shrink:0}
+.slider-val{font-size:10px;font-family:var(--font-mono);color:var(--text2);width:38px;text-align:right;flex-shrink:0}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:3px;background:var(--bg4);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}
+.swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .1s}
+.swatch:hover{transform:scale(1.15)}
+.swatch.on{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+
+.ex-list{display:flex;flex-direction:column;gap:6px}
+.ex-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;text-align:left;cursor:pointer;transition:all .15s;width:100%}
+.ex-btn:hover{border-color:rgba(124,106,247,.25);background:var(--bg2);transform:translateY(-1px)}
+.ex-name{font-size:13px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ex-desc{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--font-mono)}
+.ex-section-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-family:var(--font-display);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:4px}
+
+.shortcuts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.shortcut{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3)}
+kbd{background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:2px 7px;font-size:10px;font-family:var(--font-mono);color:var(--text2)}
+
+#toasts{position:fixed;top:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-sm);border:1px solid var(--border);backdrop-filter:blur(20px);font-size:13px;font-weight:500;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:slideIn .3s cubic-bezier(.21,1.02,.73,1) forwards}
+.toast.out{animation:slideOut .25s ease-in forwards}
+.toast-info{background:rgba(13,13,16,.95);color:var(--text)}
+.toast-success{background:rgba(10,30,20,.95);color:#6ee7b7;border-color:rgba(62,207,142,.2)}
+.toast-error{background:rgba(30,10,10,.95);color:#fca5a5;border-color:rgba(248,113,113,.2)}
+.toast svg{width:15px;height:15px;flex-shrink:0}
+
+@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(110%);opacity:0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+
+.art-video-player{border-radius:0;overflow:hidden}
+.art-subtitle-text{font-size:var(--sub-size,22px)!important;color:var(--sub-color,#fff)!important;text-shadow:var(--sub-shadow,0 1px 6px rgba(0,0,0,.9))!important;background:var(--sub-bg,transparent)!important;padding:2px 8px!important;border-radius:4px!important;font-family:var(--font-body)!important;line-height:1.6!important}
+.art-subtitle{bottom:var(--sub-bottom,70px)!important}
+.art-fullscreen .art-subtitle,.art-fullscreen-web .art-subtitle{bottom:var(--sub-bottom-fs,90px)!important}
+.art-settings{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:var(--r-sm)!important}
+.art-setting-item:hover{background:var(--bg3)!important}
+
+@media(max-width:540px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .header-title{font-size:18px}
+  .shortcuts-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<div class="wrap">
+  <header class="header">
+    <div class="header-logo">
+      <div class="logo-icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <div>
+        <div class="header-title">Proxy Tester</div>
+      </div>
+    </div>
+    <div class="status-pill" id="statusPill">
+      <div class="status-dot ready" id="statusDot"></div>
+      <span id="statusText" style="font-size:11px">Ready</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="main-col">
+      <div class="player-wrap">
+        <div id="artWrap"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            Stream Info
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Status</div>
+              <div class="stat-value"><span class="status-dot ready" id="iDot" style="width:6px;height:6px"></span><span id="iStatus" style="font-size:11px">Ready</span></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Duration</div>
+              <div class="stat-value"><span id="iDur">—</span></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Quality</div>
+              <div class="stat-value"><span id="iQual">—</span></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Type</div>
+              <div class="stat-value"><span id="iType">—</span></div>
+            </div>
+          </div>
+          <div id="tagsRow" class="tags-row"></div>
+          <div class="proxy-row">
+            <div style="flex:1;min-width:0">
+              <div class="proxy-label">Proxy URL</div>
+              <div class="proxy-val" id="iProxy">—</div>
+            </div>
+            <button class="copy-btn hidden" id="copyBtn" onclick="copyProxyUrl()">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:11px;height:11px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              Copy
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="qualPanel" style="display:none">
+        <div class="card-head">
+          <span class="card-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+            Quality Levels
+          </span>
+        </div>
+        <div class="qual-panel">
+          <div class="qual-chips" id="qualChips"></div>
+        </div>
+      </div>
+    </div>
+    <div class="side-col">
+      <div class="card">
+        <div class="card-body" style="padding-top:16px">
+          <label class="field-label" for="vidUrl">Video URL</label>
+          <div class="input-row">
+            <input type="text" id="vidUrl" placeholder="https://…m3u8 or .mp4"/>
+            <button class="btn-primary" id="loadBtn" onclick="loadVideo()">Load</button>
+          </div>
+          <div style="margin-top:14px">
+            <label class="field-label">Thumbnails <span class="field-note">— VTT sprite URL</span></label>
+            <div class="input-wrap">
+              <input type="text" id="thumbUrl" placeholder="https://example.com/thumbnails.vtt" style="padding-right:32px"/>
+              <button class="input-clear" onclick="document.getElementById('thumbUrl').value='';updateTags()" title="Clear">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <label class="field-label">Origin <span class="field-note">— sets Origin &amp; Referer</span></label>
+            <div class="input-wrap">
+              <input type="text" id="originIn" placeholder="https://example.com" style="padding-right:32px"/>
+              <button class="input-clear" onclick="document.getElementById('originIn').value='';updateTags()" title="Clear">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <button class="adv-toggle" onclick="toggleAdv()">
+              <svg class="adv-chev" id="advChev" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:12px;height:12px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+              Custom Headers <span class="field-note" style="font-family:var(--font-body)">— JSON object</span>
+            </button>
+            <div class="adv-body" id="advBody" style="padding-top:0">
+              <div style="margin-top:10px;position:relative">
+                <textarea id="headersIn" rows="3" placeholder='{"Referer":"https://example.com","Authorization":"Bearer xxx"}' oninput="validateJson()"></textarea>
+                <span id="jsonBadge" class="json-badge"></span>
+              </div>
+              <p style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.6">Overrides defaults. Applied to video, thumbnails, and all HLS segments.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+            Subtitles
+          </span>
+          <span id="subBadge" style="display:none;font-size:9px;font-weight:700;font-family:var(--font-display);background:rgba(124,106,247,.15);color:var(--accent2);border:1px solid rgba(124,106,247,.2);padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em"></span>
+        </div>
+        <div class="card-body">
+          <div class="input-row" style="margin-bottom:8px">
+            <input type="text" id="subUrl" placeholder="URL or drop file…" style="font-size:12px"/>
+            <button class="btn-icon" onclick="loadSubUrl()" title="Load from URL">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            </button>
+            <label class="btn-icon" title="Upload file">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:17px;height:17px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+              <input type="file" id="subFile" accept=".vtt,.srt,.ass,.ssa,.txt" style="display:none"/>
+            </label>
+          </div>
+
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('subFile').click()">
+            <svg class="dz-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <p class="dz-text">Drop <span>.vtt</span> · <span>.srt</span> · <span>.ass</span></p>
+          </div>
+
+          <div id="subInfo" style="display:none">
+            <div class="sub-meta">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="sub-fmt" id="subFmt">SRT</span>
+                <span class="sub-cues" id="subCues">0 cues</span>
+              </div>
+              <button class="sub-rm" onclick="removeSub()" title="Remove subtitle">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div class="sub-scroll">
+              <div class="sub-list-head">Preview — click to seek</div>
+              <div id="subPreview"></div>
+            </div>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-family:var(--font-display)">Style</div>
+              <div class="slider-row">
+                <span class="slider-label">Size</span>
+                <input type="range" id="rSize" min="14" max="44" value="22" oninput="syncStyle()"/>
+                <span class="slider-val" id="vSize">22px</span>
+              </div>
+              <div class="slider-row">
+                <span class="slider-label">BG</span>
+                <input type="range" id="rBg" min="0" max="100" value="0" oninput="syncStyle()"/>
+                <span class="slider-val" id="vBg">0%</span>
+              </div>
+              <div class="slider-row">
+                <span class="slider-label">Bottom</span>
+                <input type="range" id="rOff" min="30" max="160" value="70" oninput="syncStyle()"/>
+                <span class="slider-val" id="vOff">70px</span>
+              </div>
+              <div class="slider-row">
+                <span class="slider-label">Color</span>
+                <div class="swatches">
+                  <button class="swatch on" style="background:#fff" data-c="#ffffff" onclick="setColor('#ffffff')"></button>
+                  <button class="swatch" style="background:#fbbf24" data-c="#fbbf24" onclick="setColor('#fbbf24')"></button>
+                  <button class="swatch" style="background:#34d399" data-c="#34d399" onclick="setColor('#34d399')"></button>
+                  <button class="swatch" style="background:#60a5fa" data-c="#60a5fa" onclick="setColor('#60a5fa')"></button>
+                  <button class="swatch" style="background:#f472b6" data-c="#f472b6" onclick="setColor('#f472b6')"></button>
+                  <button class="swatch" style="background:#a78bfa" data-c="#a78bfa" onclick="setColor('#a78bfa')"></button>
+                  <button class="swatch" style="background:#fb923c" data-c="#fb923c" onclick="setColor('#fb923c')"></button>
+                  <button class="swatch" style="background:#000;border-color:#555" data-c="#000000" onclick="setColor('#000000')"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            Examples
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="ex-list">
+            <div class="ex-section-label">With Origin / Headers</div>
+            <button class="ex-btn" onclick="setEx('https://example.com/playlist.m3u8','https://example.com','','')">
+              <div class="ex-name">Origin Example <span class="tag tag-o">origin</span></div>
+              <div class="ex-desc">&amp;origin=https://example.com</div>
+            </button>
+            <button class="ex-btn" onclick="setEx('https://example.com/playlist.m3u8','','{&quot;Referer&quot;:&quot;https://example.com&quot;}','')">
+              <div class="ex-name">Headers Example <span class="tag tag-h">headers</span></div>
+              <div class="ex-desc">&amp;headers={"Referer":"..."}</div>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/></svg>
+            Shortcuts
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="shortcuts-grid">
+            <div class="shortcut"><kbd>Enter</kbd><span>Load video</span></div>
+            <div class="shortcut"><kbd>Space</kbd><span>Play / Pause</span></div>
+            <div class="shortcut"><kbd>F</kbd><span>Fullscreen</span></div>
+            <div class="shortcut"><kbd>M</kbd><span>Mute</span></div>
+            <div class="shortcut"><kbd>← →</kbd><span>Seek ±5s</span></div>
+            <div class="shortcut"><kbd>↑ ↓</kbd><span>Volume</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+let art = null, hlsInst = null, curProxy = null;
+let subEntries = [], subBlobUrl = null, lastActiveIdx = -1;
+
+const $ = id => document.getElementById(id);
+const sf = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+
+function fmt(s) {
+  if (!s || !isFinite(s)) return '—';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return h > 0
+    ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+    : `${m}:${String(sec).padStart(2,'0')}`;
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setStatus(state, label) {
+  const map = { ready:'ready', loading:'loading', loaded:'loaded', playing:'playing', paused:'paused', error:'error' };
+  const cls = map[state] || 'ready';
+  const text = label || (state.charAt(0).toUpperCase() + state.slice(1));
+  ['iDot','statusDot'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.className = 'status-dot ' + cls;
+  });
+  sf('iStatus', text);
+  sf('statusText', text);
+}
+
+function toggleAdv() {
+  $('advBody').classList.toggle('open');
+  $('advChev').classList.toggle('open');
+}
+
+function validateJson() {
+  const val = $('headersIn').value.trim();
+  const badge = $('jsonBadge');
+  const ta = $('headersIn');
+  if (!val) { badge.style.display = 'none'; ta.style.borderColor = ''; return; }
+  try {
+    const parsed = JSON.parse(val);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+    const keys = Object.keys(parsed).length;
+    badge.textContent = keys + ' key' + (keys !== 1 ? 's' : '');
+    badge.className = 'json-badge json-ok-badge';
+    badge.style.display = 'inline-flex';
+    ta.style.borderColor = 'rgba(62,207,142,.4)';
+  } catch {
+    badge.textContent = 'Invalid';
+    badge.className = 'json-badge json-err-badge';
+    badge.style.display = 'inline-flex';
+    ta.style.borderColor = 'rgba(248,113,113,.4)';
+  }
+  updateTags();
+}
+
+function updateTags() {
+  const row = $('tagsRow');
+  const origin = $('originIn').value.trim();
+  const headers = $('headersIn').value.trim();
+  const thumb = $('thumbUrl').value.trim();
+  row.innerHTML = '';
+  if (origin) {
+    const t = document.createElement('span');
+    t.className = 'tag tag-o';
+    t.textContent = 'origin';
+    row.appendChild(t);
+  }
+  if (headers) {
+    let keys = '';
+    try { keys = Object.keys(JSON.parse(headers)).join(', '); } catch { keys = 'invalid'; }
+    const t = document.createElement('span');
+    t.className = 'tag tag-h';
+    t.textContent = 'headers: ' + keys;
+    row.appendChild(t);
+  }
+  if (thumb) {
+    const t = document.createElement('span');
+    t.className = 'tag tag-t';
+    t.textContent = 'thumbnails';
+    row.appendChild(t);
+  }
+}
+
+function buildProxyUrl(targetUrl) {
+  let proxy = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+  const origin = $('originIn').value.trim();
+  const headers = $('headersIn').value.trim();
+  if (origin) proxy += `&origin=${encodeURIComponent(origin)}`;
+  if (headers) {
+    try { JSON.parse(headers); proxy += `&headers=${encodeURIComponent(headers)}`; } catch {}
+  }
+  return proxy;
+}
+
+function copyProxyUrl() {
+  if (!curProxy) return;
+  navigator.clipboard.writeText(curProxy)
+    .then(() => toast('Copied to clipboard', 'success'))
+    .catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = curProxy;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('Copied', 'success');
+    });
+}
+
+function toast(msg, type) {
+  type = type || 'info';
+  const c = $('toasts'), el = document.createElement('div');
+  const icons = {
+    info: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    success: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+    error: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+  };
+  el.className = 'toast toast-' + type;
+  el.innerHTML = icons[type] + '<span>' + msg + '</span>';
+  c.appendChild(el);
+  const delay = type === 'error' ? 5000 : 3000;
+  setTimeout(() => {
+    el.classList.add('out');
+    el.addEventListener('animationend', () => el.remove());
+  }, delay);
+}
+
+function detectSubType(url, text) {
+  if (url && /\.vtt$/i.test(url)) return 'vtt';
+  if (url && /\.(ass|ssa)$/i.test(url)) return 'ass';
+  if (text && text.trimStart().startsWith('WEBVTT')) return 'vtt';
+  if (text && /^\[Script Info\]/im.test(text)) return 'ass';
+  return 'srt';
+}
+
+function parseSrt(text) {
+  const entries = [];
+  const norm = text
+    .replace(/^WEBVTT[^\n]*\n*/i, '')
+    .replace(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/g, '$1:$2:$3,$4');
+  for (const blk of norm.trim().split(/\n\s*\n/)) {
+    const lines = blk.split('\n').map(l => l.trim()).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/(\d{1,2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2}),(\d{3})/);
+      if (m) {
+        const start = +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/1000;
+        const end   = +m[5]*3600 + +m[6]*60 + +m[7] + +m[8]/1000;
+        const c = lines.slice(i + 1).join('\n').replace(/<[^>]+>/g, '');
+        if (c) entries.push({ start, end, text: c });
+        break;
+      }
+    }
+  }
+  return entries;
+}
+
+function parseAss(text) {
+  const entries = [];
+  const evt = text.match(/\[Events\]([\s\S]*?)(?:\[|$)/i);
+  if (!evt) return entries;
+  for (const line of evt[1].split('\n').map(l => l.trim()).filter(l => l.startsWith('Dialogue:'))) {
+    const p = line.substring(9).split(',');
+    if (p.length < 10) continue;
+    const ts = t => { const [h,m,s] = t.split(':'); return +h*3600 + +m*60 + +s.replace('.', ','); };
+    const c = p.slice(9).join(',').trim().replace(/\{[^}]*\}/g,'').replace(/\\N/g,'\n').replace(/\\n/g,'\n');
+    if (c) entries.push({ start: ts(p[1].trim()), end: ts(p[2].trim()), text: c });
+  }
+  return entries;
+}
+
+function parseSubtitles(text, url) {
+  const type = detectSubType(url, text);
+  return { type, entries: type === 'ass' ? parseAss(text) : parseSrt(text) };
+}
+
+function toVttBlob(entries) {
+  const ft = s => {
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+    const ms = Math.round((s%1)*1000);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+  };
+  let vtt = 'WEBVTT\n\n';
+  for (const e of entries) vtt += `${ft(e.start)} --> ${ft(e.end)}\n${e.text}\n\n`;
+  return URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
+}
+
+function buildSubPreview(entries) {
+  const wrap = $('subPreview');
+  wrap.innerHTML = '';
+  const limit = Math.min(entries.length, 60);
+  for (let i = 0; i < limit; i++) {
+    const e = entries[i];
+    const div = document.createElement('div');
+    div.className = 'sub-entry';
+    div.dataset.idx = i;
+    div.innerHTML = `<div class="sub-time">${fmt(e.start)} → ${fmt(e.end)}</div><div class="sub-text">${esc(e.text)}</div>`;
+    div.addEventListener('click', () => { if (art) { art.currentTime = e.start; art.play(); } });
+    wrap.appendChild(div);
+  }
+  if (entries.length > 60) {
+    const m = document.createElement('div');
+    m.style.cssText = 'padding:8px 12px;font-size:10px;color:var(--text3);text-align:center';
+    m.textContent = '+' + (entries.length - 60) + ' more cues';
+    wrap.appendChild(m);
+  }
+}
+
+function highlightActiveCue(time) {
+  if (!subEntries.length) return;
+  let idx = -1;
+  for (let i = 0; i < subEntries.length; i++) {
+    if (time >= subEntries[i].start && time <= subEntries[i].end) { idx = i; break; }
+  }
+  if (idx === lastActiveIdx) return;
+  if (lastActiveIdx >= 0) {
+    const p = $('subPreview').querySelector('[data-idx="' + lastActiveIdx + '"]');
+    if (p) p.classList.remove('active');
+  }
+  if (idx >= 0 && idx < 60) {
+    const c = $('subPreview').querySelector('[data-idx="' + idx + '"]');
+    if (c) { c.classList.add('active'); c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  }
+  lastActiveIdx = idx;
+}
+
+function applySubToPlayer(blobUrl) {
+  if (subBlobUrl) URL.revokeObjectURL(subBlobUrl);
+  subBlobUrl = blobUrl;
+  if (art) art.subtitle.switch(blobUrl, { color: getSubColor(), size: getSubSize() });
+}
+
+function removeSub() {
+  if (subBlobUrl) { URL.revokeObjectURL(subBlobUrl); subBlobUrl = null; }
+  subEntries = []; lastActiveIdx = -1;
+  $('subInfo').style.display = 'none';
+  $('subBadge').style.display = 'none';
+  $('dropZone').style.display = '';
+  $('subPreview').innerHTML = '';
+  if (art) art.subtitle.switch('', {});
+  toast('Subtitle removed', 'info');
+}
+
+function showSubInfo(type, entries) {
+  $('subInfo').style.display = 'block';
+  $('dropZone').style.display = 'none';
+  $('subFmt').textContent = type.toUpperCase();
+  $('subCues').textContent = entries.length + ' cues';
+  $('subBadge').textContent = type.toUpperCase() + ' · ' + entries.length;
+  $('subBadge').style.display = 'inline-flex';
+  buildSubPreview(entries);
+}
+
+async function processSubText(text, url) {
+  const { type, entries } = parseSubtitles(text, url);
+  if (!entries.length) { toast('No cues found in file', 'error'); return; }
+  subEntries = entries; lastActiveIdx = -1;
+  showSubInfo(type, entries);
+  applySubToPlayer(toVttBlob(entries));
+  toast('Loaded ' + entries.length + ' ' + type.toUpperCase() + ' cues', 'success');
+}
+
+async function loadSubUrl() {
+  const url = $('subUrl').value.trim();
+  if (!url) { toast('Enter a subtitle URL', 'error'); return; }
+  toast('Fetching subtitle…', 'info');
+  try {
+    let r = await fetch(`/api/subtitle?url=${encodeURIComponent(url)}`);
+    if (!r.ok) r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await processSubText(await r.text(), url);
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+async function loadSubFile(file) {
+  if (!file) return;
+  toast('Reading ' + file.name + '…', 'info');
+  try { await processSubText(await file.text(), file.name); }
+  catch { toast('Failed to read file', 'error'); }
+}
+
+function getSubSize() { return parseInt($('rSize').value); }
+function getSubColor() {
+  const el = document.querySelector('.swatch.on');
+  return el ? el.dataset.c : '#ffffff';
+}
+function syncStyle() {
+  const size = $('rSize').value, bg = $('rBg').value, off = $('rOff').value;
+  $('vSize').textContent = size + 'px';
+  $('vBg').textContent = bg + '%';
+  $('vOff').textContent = off + 'px';
+  const color = getSubColor();
+  const bgVal = bg == 0 ? 'transparent' : `rgba(0,0,0,${(bg/100).toFixed(2)})`;
+  const shadow = color === '#000000'
+    ? '0 0 8px rgba(255,255,255,.6)'
+    : '0 1px 6px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.5)';
+  const r = document.documentElement;
+  r.style.setProperty('--sub-size', size + 'px');
+  r.style.setProperty('--sub-color', color);
+  r.style.setProperty('--sub-bg', bgVal);
+  r.style.setProperty('--sub-shadow', shadow);
+  r.style.setProperty('--sub-bottom', off + 'px');
+  r.style.setProperty('--sub-bottom-fs', Math.min(160, +off + 30) + 'px');
+  if (art && subBlobUrl) art.subtitle.switch(subBlobUrl, { color, size: +size });
+}
+function setColor(c) {
+  document.querySelectorAll('.swatch').forEach(el => el.classList.toggle('on', el.dataset.c === c));
+  syncStyle();
+}
+
+function buildQualPanel(levels) {
+  const panel = $('qualPanel'), chips = $('qualChips');
+  panel.style.display = 'block'; chips.innerHTML = '';
+  const auto = document.createElement('button');
+  auto.className = 'qchip on'; auto.textContent = 'Auto';
+  auto.addEventListener('click', () => {
+    if (hlsInst) hlsInst.currentLevel = -1;
+    chips.querySelectorAll('.qchip').forEach(b => b.classList.remove('on'));
+    auto.classList.add('on'); sf('iQual', 'Auto');
+  });
+  chips.appendChild(auto);
+  const heights = [...new Set(levels.map(l => l.height))].sort((a,b) => b-a);
+  for (const h of heights) {
+    const btn = document.createElement('button');
+    btn.className = 'qchip'; btn.textContent = h + 'p';
+    btn.addEventListener('click', () => {
+      if (hlsInst) { const idx = levels.findIndex(l => l.height === h); if (idx !== -1) hlsInst.currentLevel = idx; }
+      chips.querySelectorAll('.qchip').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on'); sf('iQual', h + 'p');
+    });
+    chips.appendChild(btn);
+  }
+}
+
+function setEx(url, origin, headers, thumb) {
+  $('vidUrl').value = url;
+  $('originIn').value = origin || '';
+  $('headersIn').value = headers || '';
+  $('thumbUrl').value = thumb || '';
+  validateJson();
+  updateTags();
+  if (headers) { $('advBody').classList.add('open'); $('advChev').classList.add('open'); }
+}
+function setSubIn(u) { $('subUrl').value = u; }
+
+async function buildThumbBlobUrl(thumbRaw) {
+  const vttProxyUrl = buildProxyUrl(thumbRaw);
+  let vttText;
+  try {
+    const r = await fetch(vttProxyUrl);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    vttText = await r.text();
+  } catch (e) {
+    toast('Thumbnail VTT fetch failed: ' + e.message, 'error');
+    return null;
+  }
+
+  let baseUrl = '';
+  try {
+    const u = new URL(thumbRaw);
+    baseUrl = u.origin + u.pathname.substring(0, u.pathname.lastIndexOf('/') + 1);
+  } catch {}
+
+  const lines = vttText.split('\n');
+  const out = lines.map(function(line) {
+    const t = line.trim();
+    if (!t) return line;
+    if (/^WEBVTT/i.test(t))                  return line;
+    if (/^(NOTE|STYLE|REGION)\b/i.test(t))   return line;
+    if (/-->/.test(t))                        return line;
+    if (/^\d+$/.test(t))                      return line;
+
+    const hi = t.indexOf('#');
+    const imgPart = (hi >= 0 ? t.substring(0, hi) : t).trim();
+    const fragment = hi >= 0 ? t.substring(hi) : '';
+
+    if (!imgPart) return line;
+
+    let abs = imgPart;
+    try {
+      abs = new URL(imgPart, baseUrl).href;
+    } catch {
+      abs = baseUrl + imgPart;
+    }
+
+    return buildProxyUrl(abs) + fragment;
+  });
+
+  return URL.createObjectURL(new Blob([out.join('\n')], { type: 'text/vtt' }));
+}
+
+async function loadVideo() {
+  const url = $('vidUrl').value.trim();
+  if (!url) { toast('Enter a video URL', 'error'); return; }
+
+  const headersVal = $('headersIn').value.trim();
+  if (headersVal) {
+    try {
+      const p = JSON.parse(headersVal);
+      if (typeof p !== 'object' || p === null || Array.isArray(p)) throw new Error();
+    } catch { toast('Custom headers must be a valid JSON object', 'error'); return; }
+  }
+
+  const btn = $('loadBtn');
+  btn.disabled = true;
+  setStatus('loading');
+  sf('iDur', '—'); sf('iQual', '—'); sf('iType', '—');
+  $('iProxy').textContent = '—';
+  $('iProxy').classList.remove('active');
+  $('copyBtn').classList.add('hidden');
+  $('qualPanel').style.display = 'none';
+  updateTags();
+
+  try {
+    const proxyUrl = buildProxyUrl(url);
+    curProxy = proxyUrl;
+    $('iProxy').textContent = proxyUrl;
+    $('iProxy').classList.add('active');
+    $('copyBtn').classList.remove('hidden');
+
+    let thumbProxyUrl = null;
+    const thumbRaw = $('thumbUrl').value.trim();
+    if (thumbRaw) {
+      thumbProxyUrl = await buildThumbBlobUrl(thumbRaw);
+    }
+
+    const res = await fetch(proxyUrl, { method: 'HEAD' });
+    if (!res.ok) {
+      let msg = 'Proxy returned ' + res.status;
+      try { const e = await res.json(); if (e.hint) msg += ' — ' + e.hint; } catch {}
+      throw new Error(msg);
+    }
+
+    const isHLS = /\.m3u8/i.test(url);
+    sf('iType', isHLS ? 'HLS' : 'MP4');
+
+    if (hlsInst) { hlsInst.destroy(); hlsInst = null; }
+    if (art) { art.destroy(false); art = null; }
+    $('artWrap').innerHTML = '';
+
+    const opts = {
+      container: $('artWrap'),
+      url: isHLS ? undefined : proxyUrl,
+      volume: 0.8, autoplay: false, pip: true, screenshot: true, setting: true,
+      loop: false, playbackRate: true, fullscreen: true, fullscreenWeb: true,
+      miniProgressBar: true, mutex: true, backdrop: true, playsInline: true,
+      autoPlayback: true, airplay: true, theme: '#7c6af7',
+      lang: navigator.language.startsWith('zh') ? 'zh' : 'en',
+      moreVideoAttr: { crossOrigin: 'anonymous', playsInline: true },
+      subtitle: subBlobUrl ? {
+        url: subBlobUrl,
+        type: 'vtt',
+        style: { color: getSubColor(), fontSize: getSubSize() + 'px' },
+        encoding: 'utf-8'
+      } : {},
+    };
+
+    if (thumbProxyUrl) opts.thumbnails = { url: thumbProxyUrl };
+
+    if (isHLS && Hls.isSupported()) {
+      opts.customType = {
+        m3u8: function(video, srcUrl, artInst) {
+          if (hlsInst) hlsInst.destroy();
+          hlsInst = new Hls({ debug: false, enableWorker: true, lowLatencyMode: true, backBufferLength: 90 });
+          hlsInst.loadSource(srcUrl);
+          hlsInst.attachMedia(video);
+          hlsInst.on(Hls.Events.MANIFEST_PARSED, function() {
+            if (hlsInst.levels && hlsInst.levels.length > 1) buildQualPanel(hlsInst.levels);
+            setStatus('loaded');
+            toast(thumbProxyUrl ? 'Video + Thumbnails loaded!' : 'Video loaded!', 'success');
+          });
+          hlsInst.on(Hls.Events.ERROR, function(_, data) {
+            if (data.fatal) { setStatus('error'); toast('HLS Error: ' + data.details, 'error'); }
+          });
+          hlsInst.on(Hls.Events.LEVEL_SWITCHED, function(_, data) {
+            const lv = hlsInst.levels[data.level];
+            if (lv) sf('iQual', lv.height + 'p');
+          });
+          artInst.on('destroy', function() { if (hlsInst) { hlsInst.destroy(); hlsInst = null; } });
+        }
+      };
+      opts.url = proxyUrl;
+      opts.type = 'm3u8';
+    } else if (isHLS && document.createElement('video').canPlayType('application/vnd.apple.mpegurl')) {
+      opts.url = proxyUrl; opts.type = 'm3u8';
+    }
+
+    art = new Artplayer(opts);
+
+    art.on('video:loadedmetadata', function() {
+      const d = art.duration;
+      if (d && isFinite(d)) sf('iDur', fmt(d));
+      if (subBlobUrl) art.subtitle.switch(subBlobUrl, { color: getSubColor(), size: getSubSize() });
+    });
+    art.on('video:play',    function() { setStatus('playing'); });
+    art.on('video:pause',   function() { setStatus('paused'); });
+    art.on('video:ended',   function() { setStatus('ready'); });
+    art.on('video:error',   function() { setStatus('error'); toast('Playback error', 'error'); });
+    art.on('video:timeupdate', function() { highlightActiveCue(art.currentTime); });
+
+    if (!isHLS) { setStatus('loaded'); toast('Video loaded!', 'success'); }
+
+  } catch (err) {
+    setStatus('error');
+    toast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  art = new Artplayer({
+    container: $('artWrap'),
+    url: '',
+    theme: '#7c6af7',
+    volume: 0.8,
+    setting: true,
+    fullscreen: true,
+    fullscreenWeb: true,
+    miniProgressBar: true,
+    mutex: true,
+    backdrop: true,
+    lang: navigator.language.startsWith('zh') ? 'zh' : 'en',
+    moreVideoAttr: { crossOrigin: 'anonymous', playsInline: true },
+  });
+
+  $('subFile').addEventListener('change', function(e) {
+    if (e.target.files[0]) loadSubFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  const dz = $('dropZone');
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, function(e) {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add('over');
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, function(e) {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove('over');
+  }));
+  dz.addEventListener('drop', function(e) {
+    const f = e.dataTransfer.files[0]; if (f) loadSubFile(f);
+  });
+
+  const subCard = $('subUrl').closest('.card');
+  subCard.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('over'); });
+  subCard.addEventListener('dragleave', function(e) { e.preventDefault(); dz.classList.remove('over'); });
+  subCard.addEventListener('drop', function(e) {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0]; if (f) loadSubFile(f);
+  });
+
+  $('vidUrl').addEventListener('keypress', function(e) { if (e.key === 'Enter') loadVideo(); });
+  $('subUrl').addEventListener('keypress', function(e) { if (e.key === 'Enter') loadSubUrl(); });
+  $('originIn').addEventListener('input', updateTags);
+  $('thumbUrl').addEventListener('input', updateTags);
+
+  syncStyle();
+  updateTags();
+});
+</script>
+</body>
+</html>
