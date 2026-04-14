@@ -1,13 +1,5 @@
 import { getHeadersForUrl, getCorsHeaders } from './config.js';
 
-let httpAgent  = null;
-let httpsAgent = null;
-import('http').then(({ Agent }) => {
-  httpAgent = new Agent({ keepAlive: true, maxSockets: 128, maxFreeSockets: 32, timeout: 60000 });
-}).catch(() => {});
-import('https').then(({ Agent }) => {
-  httpsAgent = new Agent({ keepAlive: true, maxSockets: 128, maxFreeSockets: 32, timeout: 60000 });
-}).catch(() => {});
 
 const CACHE = {
   m3u8:    'public, s-maxage=60, max-age=30, stale-while-revalidate=300, stale-if-error=86400',
@@ -126,89 +118,19 @@ function titleCase(header) {
   return header.split('-').map(p => p[0].toUpperCase() + p.slice(1)).join('-');
 }
 
-function pipeMedia(targetUrl, reqHeaders, clientReq, clientRes) {
-  return new Promise(async (resolve) => {
-    const isHttps = targetUrl.startsWith('https');
-    const { request } = await import(isHttps ? 'https' : 'http');
-    const parsed = new URL(targetUrl);
-    const isHead = clientReq.method.toUpperCase() === 'HEAD';
 
-    const upReq = request({
-      hostname: parsed.hostname,
-      port:     parsed.port || (isHttps ? 443 : 80),
-      path:     parsed.pathname + parsed.search,
-      method:   isHead ? 'HEAD' : 'GET',
-      headers:  reqHeaders,
-      agent:    isHttps ? httpsAgent : httpAgent,
-      timeout:  30000,
-    }, upRes => {
-      const status = upRes.statusCode ?? 200;
-      const headers = { 'Accept-Ranges': 'bytes' };
-
-      for (const key of ['content-type','content-length','content-range','etag','last-modified','cache-control']) {
-        if (upRes.headers[key]) headers[titleCase(key)] = upRes.headers[key];
-      }
-
-      if (isHead) {
-        clientRes.writeHead(status, headers);
-        clientRes.end();
-        upRes.resume();
-        resolve();
-        return;
-      }
-
-      clientRes.writeHead(status, headers);
-
-      clientReq.on('close', () => { upReq.destroy(); resolve(); });
-
-      upRes.pipe(clientRes, { end: true });
-      upRes.on('end', resolve);
-      upRes.on('error', err => {
-        console.error('[UPSTREAM PIPE]', err.message);
-        resolve();
-      });
-    });
-
-    upReq.on('error', err => {
-      console.error('[UPSTREAM REQ]', err.message);
-      if (!clientRes.headersSent) {
-        clientRes.writeHead(502, { 'Content-Type': 'application/json' });
-        clientRes.end(JSON.stringify({ status: 'error', message: err.message }));
-      }
-      resolve();
-    });
-
-    upReq.on('timeout', () => {
-      upReq.destroy();
-      if (!clientRes.headersSent) {
-        clientRes.writeHead(504, { 'Content-Type': 'application/json' });
-        clientRes.end(JSON.stringify({ status: 'error', message: 'Upstream timeout' }));
-      }
-      resolve();
-    });
-
-    upReq.end();
-  });
-}
-
-export async function expressMiddleware(req, res) {
-  let fullUrl = req.url ?? '';
-  if (!fullUrl.startsWith('http')) {
-    const proto = req.headers['x-forwarded-proto'] ?? (req.socket?.encrypted ? 'https' : 'http');
-    const host  = req.headers.host ?? 'localhost:3000';
-    fullUrl = `${proto}://${host}${fullUrl}`;
-  }
-
-  const url = new URL(fullUrl);
+export default async function handler(req) {
+  const url = new URL(req.url);
   const enc = url.searchParams.get('url');
-  const origin = req.headers.origin
-    ?? req.headers.referer?.split('/').slice(0, 3).join('/') ?? null;
+  const origin = req.headers.get('origin')
+    ?? req.headers.get('referer')?.split('/').slice(0, 3).join('/') ?? null;
   const corsHeaders = getCorsHeaders(origin);
 
   function sendError(status, message, extra = {}) {
-    if (res.headersSent) return;
-    res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders });
-    res.end(JSON.stringify({ status: 'error', message, ...extra }, null, 2));
+    return new Response(
+      JSON.stringify({ status: 'error', message, ...extra }, null, 2),
+      { status, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
   }
 
   if (!enc) {
@@ -256,9 +178,22 @@ export async function expressMiddleware(req, res) {
 
     const ext = getExt(targetUrl.split('?')[0]);
     if (VIDEO_EXTS.has(ext) || AUDIO_EXTS.has(ext)) {
-      for (const [k, v] of Object.entries(corsHeaders)) res.setHeader(k, v);
-      await pipeMedia(targetUrl, mergedHeaders, req, res);
-      return;
+      const response = await fetch(targetUrl, {
+        headers: mergedHeaders,
+      });
+      
+      const headers = {
+        ...corsHeaders,
+        'Content-Type': response.headers.get('content-type') || 'application/octet-stream',
+        'Content-Length': response.headers.get('content-length'),
+        'Content-Range': response.headers.get('content-range'),
+        'Accept-Ranges': response.headers.get('accept-ranges') || 'bytes',
+      };
+      
+      return new Response(response.body, {
+        status: response.status,
+        headers,
+      });
     }
 
     const isHead = req.method.toUpperCase() === 'HEAD';
@@ -296,14 +231,18 @@ export async function expressMiddleware(req, res) {
       const baseUrl   = targetUrl.slice(0, targetUrl.lastIndexOf('/') + 1);
       const proxyBase = url.origin + url.pathname;
       const rewritten = rewriteM3U8(text, baseUrl, proxyBase, passParams);
-      const h = { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': CACHE.m3u8, ...corsHeaders };
-      const etag = upstream.headers.get('etag');
-      const lm   = upstream.headers.get('last-modified');
-      if (etag) h['ETag'] = etag;
-      if (lm)   h['Last-Modified'] = lm;
-      res.writeHead(200, h);
-      res.end(rewritten);
-      return;
+      const headers = {
+        'Content-Type': 'application/vnd.apple.mpegurl',
+        'Cache-Control': CACHE.m3u8,
+        'ETag': upstream.headers.get('etag'),
+        'Last-Modified': upstream.headers.get('last-modified'),
+        ...corsHeaders
+      };
+      
+      return new Response(rewritten, {
+        status: 200,
+        headers: Object.fromEntries(Object.entries(headers).filter(([_, v]) => v != null))
+      });
     }
 
     if (isVtt) {
@@ -312,55 +251,78 @@ export async function expressMiddleware(req, res) {
       const proxyBase = url.origin + url.pathname;
       const isThumbs  = /#xywh=/i.test(text);
       const body      = isThumbs ? rewriteThumbnailVtt(text, baseUrl, proxyBase, passParams) : text;
-      res.writeHead(200, { 'Content-Type': 'text/vtt; charset=utf-8', 'Cache-Control': isThumbs ? CACHE.thumb : CACHE.vtt, ...corsHeaders });
-      res.end(body);
-      return;
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/vtt; charset=utf-8',
+          'Cache-Control': isThumbs ? CACHE.thumb : CACHE.vtt,
+          ...corsHeaders
+        }
+      });
     }
 
     if (isKey) {
-      const h = { 'Content-Type': 'application/octet-stream', 'Cache-Control': CACHE.key, 'Content-Encoding': 'identity', ...corsHeaders };
-      const cl = upstream.headers.get('content-length');
-      if (cl) h['Content-Length'] = cl;
-      res.writeHead(upstream.status, h);
-      const { Readable } = await import('stream');
-      Readable.fromWeb(upstream.body).pipe(res);
-      return;
+      const headers = {
+        'Content-Type': 'application/octet-stream',
+        'Cache-Control': CACHE.key,
+        'Content-Encoding': 'identity',
+        'Content-Length': upstream.headers.get('content-length'),
+        ...corsHeaders
+      };
+      
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: Object.fromEntries(Object.entries(headers).filter(([_, v]) => v != null))
+      });
     }
 
     const ct    = getContentType(targetUrl, upstream.headers.get('content-type'));
     const cache = getCacheControl(targetUrl);
 
     if (ct.includes('text/html')) {
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': cache,
-        'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
-        'X-Frame-Options': 'SAMEORIGIN', ...corsHeaders,
+      return new Response(await upstream.text(), {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': cache,
+          'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
+          'X-Frame-Options': 'SAMEORIGIN',
+          ...corsHeaders,
+        }
       });
-      res.end(await upstream.text());
-      return;
     }
 
-    const h = { 'Content-Type': ct, 'Cache-Control': cache, 'Accept-Ranges': 'bytes', ...corsHeaders };
-    for (const name of ['content-range','content-length','etag','last-modified']) {
-      const val = upstream.headers.get(name);
-      if (val) h[titleCase(name)] = val;
-    }
+    const headers = {
+      'Content-Type': ct,
+      'Cache-Control': cache,
+      'Accept-Ranges': 'bytes',
+      'Content-Range': upstream.headers.get('content-range'),
+      'Content-Length': upstream.headers.get('content-length'),
+      'ETag': upstream.headers.get('etag'),
+      'Last-Modified': upstream.headers.get('last-modified'),
+      ...corsHeaders
+    };
 
     let status = upstream.status;
-    if (range && status === 200) { delete h['Content-Range']; }
+    if (range && status === 200) { delete headers['Content-Range']; }
     if (range && status === 206) { status = 206; }
 
-    if (isHead) { res.writeHead(status, h); res.end(); return; }
+    if (isHead) {
+      return new Response(null, {
+        status,
+        headers: Object.fromEntries(Object.entries(headers).filter(([_, v]) => v != null))
+      });
+    }
 
-    res.writeHead(status, h);
-    const { Readable } = await import('stream');
-    Readable.fromWeb(upstream.body).pipe(res);
+    return new Response(upstream.body, {
+      status,
+      headers: Object.fromEntries(Object.entries(headers).filter(([_, v]) => v != null))
+    });
 
   } catch (err) {
     console.error('[ERROR] Proxy:', err);
-    sendError(500, 'Proxy Error', { detail: err.message, url: targetUrl });
+    return sendError(500, 'Proxy Error', { detail: err.message, url: targetUrl });
   }
 }
 
 export const config = { runtime: 'edge' };
-export default expressMiddleware;
